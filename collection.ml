@@ -4,7 +4,7 @@ module type COLLECDESCR =
 sig
 	val name : string
 	type t
-	val validate : int -> bool
+	val validate : t -> bool
 	val of_yojson : Yojson.Safe.json -> (t, string) Result.result
 	val to_yojson : t -> Yojson.Safe.json
 end
@@ -13,8 +13,7 @@ module type COLLECTION =
 sig
 	val name : string
 	type t
-	type idtype
-	val validate : int -> bool
+	val validate : t -> bool
 	val ok : bool
 	val find_one : string -> t option
 	val to_yojson : t -> Yojson.Safe.json
@@ -30,7 +29,6 @@ module Make : MAKECOLLECTION =
 	struct
 		let name = Collec.name
 		type t = Collec.t
-		type idtype = string
 		let validate = Collec.validate
 		let ok = true
 		let find_one id =
