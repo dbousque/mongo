@@ -1,6 +1,6 @@
 
 
-type t = string option
+type t = string option [@@deriving yojson]
 
 let null = None
 
