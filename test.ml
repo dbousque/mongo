@@ -1,5 +1,7 @@
 
 
+open Mybson
+
 module Connection = struct
 	include Database.StdLocal
 	let db = "mongo_test_ocaml"
@@ -48,14 +50,17 @@ let () =
 	} in
 	UsersFinder.run query *)
 	let docs = Users.find [(
-			"qty", `Assoc [("$gt", `Int 4)]
+			"qty", Assoc [("$gt", Int 4)]
 		) ;
 		(
-			"user", `ObjectId my_user.UsersSchema._id
+			"user", ObjectId my_user.UsersSchema._id
+		) ;
+		(
+			"followers_count", List [Yojson (UsersSchema.follow_to_yojson UsersSchema.One)]
 		)
 	] in
 	let my_doc = Users.find_one [(
-		"name", `String "dodo"
+		"name", String "dodo"
 	)] in
 	(*
 	{
@@ -65,7 +70,7 @@ let () =
 		"users", `Assoc [("$gt", `Int 4)]
 	)]
 	*)
-	List.map (fun doc -> doc |> Users.to_string |> print_endline) docs ;
+	List.map (fun doc -> doc |> Users.to_pstring |> print_endline) docs ;
 	print_endline "ok"
 
 

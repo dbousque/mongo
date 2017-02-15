@@ -2,7 +2,17 @@
 
 type t = string option [@@deriving yojson]
 
+exception Null_ObjectId
+
 let null = None
+
+let is_null = function
+	| None -> true
+	| Some _ -> false
+
+let get_id = function
+	| None -> raise Null_ObjectId
+	| Some id -> id
 
 let of_string str =
 	Some str
