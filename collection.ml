@@ -1,31 +1,8 @@
 
 
-open Mybson
-
 exception Find_one_failed
 
-let rec yojson_to_bson = function
-	| `Null -> Bson.create_null ()
-	| `Bool b -> Bson.create_boolean b
-	| `Int i -> Bson.create_int32 (Int32.of_int i)
-	| `Float f -> Bson.create_double f
-	| `String s -> Bson.create_string s
-	| `Intlit s -> Bson.create_string s
-	| `List l -> Bson.create_list (List.map yojson_to_bson l)
-	| `Tuple l -> Bson.create_list (List.map yojson_to_bson l)
-	| `Assoc l -> Bson.create_doc_element (yojson_assoc_to_bson l)
-	| `Variant (k, None) -> Bson.create_string k
-	| `Variant (k, Some v) -> Bson.create_list [Bson.create_string k ; yojson_to_bson v]
-
-and yojson_assoc_to_bson yojson =
-	let rec _yojson_assoc_to_bson doc = function
-		| [] -> doc
-		| (key, value)::rest -> ( let new_doc = Bson.add_element key (yojson_to_bson value) doc in
-								_yojson_assoc_to_bson new_doc rest )
-	in
-	_yojson_assoc_to_bson Bson.empty yojson
-
-let rec bson_to_raw_bson = function
+(*let rec bson_to_raw_bson = function
 	| Null -> Bson.create_null ()
 	| Bool b -> Bson.create_boolean b
 	| Int i -> Bson.create_int32 (Int32.of_int i)
@@ -49,7 +26,25 @@ and assoc_to_raw_bson query =
 		| (key, value)::rest -> let new_doc = Bson.add_element key (bson_to_raw_bson value) doc in
 								_assoc_to_bson new_doc rest
 	in
-	_assoc_to_bson Bson.empty query
+	_assoc_to_bson Bson.empty query*)
+
+let adjust_incoming_id = function
+	| `Assoc l -> (
+			try
+				let _id = Yojson.Safe.Util.member "_id" l in
+				let _handle_pair = function
+					| ("_id", value) -> (
+						match value with
+						| `Null -> ("_id", ObjectId.null)
+						| `ObjectId id -> ("_id", ObjectId.of_string id)
+						| _ -> failwith "unexpected _id"
+					  )
+					| e -> e
+				in
+				`Assoc (List.map (fun pair -> _handle_pair pair) l)
+			with Yojson.Safe.Util.Type_error (msg, _) -> failwith "Document returned by MongoDB didn't have an _id field"
+		)
+	| _ -> failwith "MongoDB apparently didn't return a document"
 
 module type COLLECDESCR =
 sig
@@ -65,12 +60,15 @@ sig
 	type t
 	val collection : string
 	val validate : t -> bool
-	val find : (string * Mybson.mybson) list -> t list
-	val find_one : (string * Mybson.mybson) list -> t option
+	val find : (string * Bson.element) list -> (t option) list
+	val ffind : (string * Bson.element) list -> t list
+	val find_one : (string * Bson.element) list -> t option
+	val ffind_one : (string * Bson.element) list -> t
 	val insert : t -> t
 	val to_yojson : t -> Yojson.Safe.json
 	val to_string : t -> string
 	val to_pstring : t -> string
+	val pprint : t -> unit
 end
 
 module type MAKECOLLECTION =
@@ -85,16 +83,33 @@ module Make : MAKECOLLECTION =
 		let validate = Collec.validate
 		let collection_connection = Mongo.create Db.host Db.port Db.db collection
 
-		let raw_bson_to_yojson =
+		let raw_bson_to_yojson bson =
+			`Assoc [("lolz", `Int 4)]
 
 		let insert doc =
+			let bson = doc |> Collec.to_yojson |> Bson.of_yojson in
+			Mongo.insert collection_connection [Bson.get_doc_element bson] ;
 			doc
 
 		let find query =
-			let raw_bson = assoc_to_raw_bson query in
-			let reply = Mongo.find_q_one collection_connection raw_bson in
+			let _of_yojson_option doc =
+				match Collec.of_yojson doc with
+				| Result.Error err -> print_endline ("error decoding : " ^ err) ; None
+				| Result.Ok elt -> Some elt
+			in
+			let reply = Mongo.find_q_one collection_connection query in
 			let docs = MongoReply.get_document_list reply in
-			List.map (fun x -> x |> raw_bson_to_yojson |> of_yojson) docs
+			List.map (fun x -> x |> raw_bson_to_yojson |> adjust_incoming_id |> _of_yojson_option) docs
+
+		let ffind query =
+			let _of_yojson_fail doc =
+				match Collec.of_yojson doc with
+				| Result.Error err -> failwith ("error decoding : " ^ err)
+				| Result.Ok elt -> elt
+			in
+			let reply = Mongo.find_q_one collection_connection query in
+			let docs = MongoReply.get_document_list reply in
+			List.map (fun x -> x |> raw_bson_to_yojson |> adjust_incoming_id |> _of_yojson_fail) docs
 
 		let find_one query =
 			let json = Yojson.Safe.from_string "{\"_id\": null, \"name\": \"hello name\", \"age\": 42, \"followers_count\": [[\"One\"], [\"Two\"]]}" in
@@ -116,4 +131,7 @@ module Make : MAKECOLLECTION =
 
 		let to_pstring elt =
 			elt |> to_yojson |> Yojson.Safe.pretty_to_string
+
+		let pprint elt =
+			elt |> to_pstring |> print_endline
 	end

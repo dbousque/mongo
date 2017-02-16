@@ -1,7 +1,5 @@
 
 
-open Mybson
-
 module Connection = struct
 	include Database.StdLocal
 	let db = "mongo_test_ocaml"
@@ -31,6 +29,7 @@ let () =
 		age = 16 ;
 		followers_count = [One ; Two ; One] 
 	} in
+	let my_user = Users.insert my_user in
 	(*
 	print_endline (Users.to_string my_user) ;
 	let my_task = Tasks.find "54759eb3c090d83494e2d804" in
@@ -49,19 +48,15 @@ let () =
 		name = 
 	} in
 	UsersFinder.run query *)
-	let docs = Users.find [(
-			"qty", Assoc [("$gt", Int 4)]
+	let docs = Users.ffind [(
+			"qty", Bson.Doc [("$gt", Bson.Int 4)]
 		) ;
 		(
-			"user", ObjectId my_user.UsersSchema._id
-		) ;
-		(
-			"followers_count", List [Yojson (UsersSchema.follow_to_yojson UsersSchema.One)]
+			"followers_count", (Bson.Array [UsersSchema.One |> UsersSchema.follow_to_yojson |> Bson.of_yojson])
 		)
 	] in
-	let my_doc = Users.find_one [(
-		"name", String "dodo"
-	)] in
+	let docs = Users.ffind [] in
+	let my_doc = Users.find_one [] in
 	(*
 	{
 		"users": {"$gt": 4}
@@ -70,7 +65,9 @@ let () =
 		"users", `Assoc [("$gt", `Int 4)]
 	)]
 	*)
-	List.map (fun doc -> doc |> Users.to_pstring |> print_endline) docs ;
+	print_int (List.length docs) ;
+	print_endline "" ;
+	List.iter Users.pprint docs ;
 	print_endline "ok"
 
 
