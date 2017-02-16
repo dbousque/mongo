@@ -54,7 +54,7 @@ let rec of_yojson = function
   | `Null -> Null
   | `Bool b -> Bool b
   | `Int i -> Int i
-  | `Intlit s -> String s
+  | `Intlit s -> Int64 (Int64.of_string s)
   | `Float f -> Double f
   | `Floatlit s -> String s
   | `String s -> String s
@@ -72,6 +72,47 @@ and yojson_assoc_to_bson yojson =
                 _yojson_assoc_to_bson new_doc rest )
   in
   _yojson_assoc_to_bson empty yojson
+
+let of_yojson_top_doc json =
+  let rec _remove_id = function
+    | [] -> []
+    | ("_id", value)::rest -> ( match value with
+          | `Null -> _remove_id rest
+          | `String str -> ("_id", ObjectId str)::(_remove_id rest)
+          | _ -> failwith "bad _id field"
+      )
+    | (key, value)::rest -> (key, of_yojson value)::(_remove_id rest)
+  in
+  match json with
+  | `Assoc l -> _remove_id l
+  | _ -> failwith "should be top doc"
+
+let rec element_to_yojson = function
+  | Double f -> `Float f
+  | String s -> `String s
+  | Doc d -> to_yojson d
+  | Array l -> `List (List.map element_to_yojson l)
+  | Binary (Generic s) -> `String s
+  | Binary (Function s) -> `String s
+  | Binary (UUID s) -> `String s
+  | Binary (MD5 s) -> `String s
+  | Binary (UserDefined s) -> `String s
+  | ObjectId s -> `String s (* only 12 bytes *)
+  | Bool b -> `Bool b
+  | UTC u -> `Intlit (Int64.to_string u)
+  | Null -> `Null
+  | Int i -> `Int i
+  | Int64 i -> `Intlit (Int64.to_string i)
+  | Timestamp i -> `Intlit (Int64.to_string i)
+  | _ -> failwith "can't convert bson to yojson"
+
+and to_yojson doc =
+  let rec _to_yojson l = function
+    | [] -> `Assoc l
+    | (key, value)::rest -> ( let new_l = (key, element_to_yojson value)::l in
+                _to_yojson new_l rest )
+  in
+  _to_yojson [] doc
 
 let is_empty = function
   | [] -> true

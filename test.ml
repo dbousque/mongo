@@ -29,7 +29,7 @@ let () =
 		age = 16 ;
 		followers_count = [One ; Two ; One] 
 	} in
-	let my_user = Users.insert my_user in
+	(*let my_user = Users.insert my_user in *)
 	(*
 	print_endline (Users.to_string my_user) ;
 	let my_task = Tasks.find "54759eb3c090d83494e2d804" in
@@ -56,7 +56,12 @@ let () =
 		)
 	] in
 	let docs = Users.ffind [] in
-	let my_doc = Users.find_one [] in
+	let my_doc = Users.find_one [(
+		"_id", Bson.Doc [("$not", Bson.Null)]
+	)] in
+	let docs = Users.ffind [(
+		"_id", Bson.ObjectId ObjectId.null
+	)] in
 	(*
 	{
 		"users": {"$gt": 4}

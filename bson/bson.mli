@@ -74,6 +74,10 @@ val add_element : string -> element -> t -> t;;
 
 val of_yojson : Yojson.Safe.json -> element
 
+val of_yojson_top_doc : Yojson.Safe.json -> document
+
+val to_yojson : document -> Yojson.Safe.json
+
 (** {6 Basic operations on Bson document} *)
 
 (** Check whether this Bson document empty or not *)

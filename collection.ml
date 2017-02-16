@@ -28,7 +28,7 @@ and assoc_to_raw_bson query =
 	in
 	_assoc_to_bson Bson.empty query*)
 
-let adjust_incoming_id = function
+(*let adjust_incoming_id = function
 	| `Assoc l -> (
 			try
 				let _id = Yojson.Safe.Util.member "_id" l in
@@ -44,7 +44,7 @@ let adjust_incoming_id = function
 				`Assoc (List.map (fun pair -> _handle_pair pair) l)
 			with Yojson.Safe.Util.Type_error (msg, _) -> failwith "Document returned by MongoDB didn't have an _id field"
 		)
-	| _ -> failwith "MongoDB apparently didn't return a document"
+	| _ -> failwith "MongoDB apparently didn't return a document"*)
 
 module type COLLECDESCR =
 sig
@@ -84,11 +84,11 @@ module Make : MAKECOLLECTION =
 		let collection_connection = Mongo.create Db.host Db.port Db.db collection
 
 		let raw_bson_to_yojson bson =
-			`Assoc [("lolz", `Int 4)]
+			Bson.to_yojson bson
 
 		let insert doc =
-			let bson = doc |> Collec.to_yojson |> Bson.of_yojson in
-			Mongo.insert collection_connection [Bson.get_doc_element bson] ;
+			let bson = doc |> Collec.to_yojson |> Bson.of_yojson_top_doc in
+			Mongo.insert collection_connection [bson] ;
 			doc
 
 		let find query =
@@ -97,9 +97,9 @@ module Make : MAKECOLLECTION =
 				| Result.Error err -> print_endline ("error decoding : " ^ err) ; None
 				| Result.Ok elt -> Some elt
 			in
-			let reply = Mongo.find_q_one collection_connection query in
+			let reply = Mongo.find_q collection_connection query in
 			let docs = MongoReply.get_document_list reply in
-			List.map (fun x -> x |> raw_bson_to_yojson |> adjust_incoming_id |> _of_yojson_option) docs
+			List.map (fun x -> x |> raw_bson_to_yojson |> _of_yojson_option) docs
 
 		let ffind query =
 			let _of_yojson_fail doc =
@@ -107,9 +107,9 @@ module Make : MAKECOLLECTION =
 				| Result.Error err -> failwith ("error decoding : " ^ err)
 				| Result.Ok elt -> elt
 			in
-			let reply = Mongo.find_q_one collection_connection query in
+			let reply = Mongo.find_q collection_connection query in
 			let docs = MongoReply.get_document_list reply in
-			List.map (fun x -> x |> raw_bson_to_yojson |> adjust_incoming_id |> _of_yojson_fail) docs
+			List.map (fun x -> x |> raw_bson_to_yojson |> _of_yojson_fail) docs
 
 		let find_one query =
 			let json = Yojson.Safe.from_string "{\"_id\": null, \"name\": \"hello name\", \"age\": 42, \"followers_count\": [[\"One\"], [\"Two\"]]}" in
