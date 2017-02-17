@@ -20,3 +20,7 @@ let of_string str =
 let to_string = function
 	| None -> "null"
 	| Some str -> str
+
+let to_bson = function
+	| None -> Bson.Null
+	| Some id -> Bson.ObjectId id

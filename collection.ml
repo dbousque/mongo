@@ -91,37 +91,38 @@ module Make : MAKECOLLECTION =
 			Mongo.insert collection_connection [bson] ;
 			doc
 
-		let find query =
-			let _of_yojson_option doc =
-				match Collec.of_yojson doc with
-				| Result.Error err -> print_endline ("error decoding : " ^ err) ; None
-				| Result.Ok elt -> Some elt
-			in
-			let reply = Mongo.find_q collection_connection query in
-			let docs = MongoReply.get_document_list reply in
-			List.map (fun x -> x |> raw_bson_to_yojson |> _of_yojson_option) docs
-
-		let ffind query =
-			let _of_yojson_fail doc =
-				match Collec.of_yojson doc with
-				| Result.Error err -> failwith ("error decoding : " ^ err)
-				| Result.Ok elt -> elt
-			in
-			let reply = Mongo.find_q collection_connection query in
-			let docs = MongoReply.get_document_list reply in
-			List.map (fun x -> x |> raw_bson_to_yojson |> _of_yojson_fail) docs
-
-		let find_one query =
-			let json = Yojson.Safe.from_string "{\"_id\": null, \"name\": \"hello name\", \"age\": 42, \"followers_count\": [[\"One\"], [\"Two\"]]}" in
-			match Collec.of_yojson json with
-			| Result.Error str -> print_endline str ; None
+		let of_yojson_option doc =
+			match Collec.of_yojson doc with
+			| Result.Error err -> print_endline ("error decoding : " ^ err) ; None
 			| Result.Ok elt -> Some elt
 
-		let ffind_one query =
-			let json = Yojson.Safe.from_string "{\"_id\": null, \"name\": \"hello name\", \"age\": 42, \"followers_count\": [[\"One\"], [\"Two\"]]}" in
-			match Collec.of_yojson json with
-			| Result.Error str -> print_endline str ; raise (Find_one_failed)
+		let of_yojson_fail doc =
+			match Collec.of_yojson doc with
+			| Result.Error err -> failwith ("error decoding : " ^ err)
 			| Result.Ok elt -> elt
+
+		let raw_find query_func handle_result query =
+			let reply = query_func collection_connection query in
+			let docs = MongoReply.get_document_list reply in
+			List.map (fun x -> x |> raw_bson_to_yojson |> handle_result) docs
+
+		let find query =
+			raw_find Mongo.find_q of_yojson_option query
+
+		let ffind query =
+			raw_find Mongo.find_q of_yojson_fail query
+
+		let find_one query =
+			let doc = raw_find Mongo.find_q_one of_yojson_option query in
+			match doc with
+			| [] -> failwith "find_one found no doc"
+			| doc::rest -> doc
+
+		let ffind_one query =
+			let doc = raw_find Mongo.find_q_one of_yojson_fail query in
+			match doc with
+			| [] -> failwith "ffind_one found no doc"
+			| doc::rest -> doc
 
 		let to_yojson =
 			Collec.to_yojson

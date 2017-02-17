@@ -29,7 +29,7 @@ let () =
 		age = 16 ;
 		followers_count = [One ; Two ; One] 
 	} in
-	(*let my_user = Users.insert my_user in *)
+	let my_user = Users.insert my_user in
 	(*
 	print_endline (Users.to_string my_user) ;
 	let my_task = Tasks.find "54759eb3c090d83494e2d804" in
@@ -56,11 +56,15 @@ let () =
 		)
 	] in
 	let docs = Users.ffind [] in
-	let my_doc = Users.find_one [(
-		"_id", Bson.Doc [("$not", Bson.Null)]
+	let q = [(
+		"_id", Bson.Doc [(
+			"$ne", Bson.Null
+		)]
 	)] in
+	print_endline (Yojson.Safe.pretty_to_string (Bson.to_yojson q)) ;
+	let my_doc = Users.ffind_one q in
 	let docs = Users.ffind [(
-		"_id", Bson.ObjectId ObjectId.null
+		"_id", ObjectId.to_bson my_doc.UsersSchema._id
 	)] in
 	(*
 	{
@@ -69,9 +73,11 @@ let () =
 	[(
 		"users", `Assoc [("$gt", `Int 4)]
 	)]
+	[(
+		"users", Doc [("$gt", Int 4)]
+	)]
 	*)
-	print_int (List.length docs) ;
-	print_endline "" ;
+	Users.pprint my_doc ;
 	List.iter Users.pprint docs ;
 	print_endline "ok"
 
