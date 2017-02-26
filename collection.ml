@@ -86,11 +86,6 @@ module Make : MAKECOLLECTION =
 		let raw_bson_to_yojson bson =
 			Bson.to_yojson bson
 
-		let insert doc =
-			let bson = doc |> Collec.to_yojson |> Bson.of_yojson_top_doc in
-			Mongo.insert collection_connection [bson] ;
-			doc
-
 		let of_yojson_option doc =
 			match Collec.of_yojson doc with
 			| Result.Error err -> print_endline ("error decoding : " ^ err) ; None
@@ -100,6 +95,11 @@ module Make : MAKECOLLECTION =
 			match Collec.of_yojson doc with
 			| Result.Error err -> failwith ("error decoding : " ^ err)
 			| Result.Ok elt -> elt
+
+		let insert doc =
+			let bson = doc |> Collec.to_yojson |> Bson.of_yojson_top_doc in
+			Mongo.insert collection_connection [bson] ;
+			doc
 
 		let raw_find query_func handle_result query =
 			let reply = query_func collection_connection query in
@@ -115,8 +115,9 @@ module Make : MAKECOLLECTION =
 		let find_one query =
 			let doc = raw_find Mongo.find_q_one of_yojson_option query in
 			match doc with
-			| [] -> failwith "find_one found no doc"
-			| doc::rest -> doc
+			| [] -> None
+			| None::rest -> None
+			| (Some doc)::rest -> Some doc
 
 		let ffind_one query =
 			let doc = raw_find Mongo.find_q_one of_yojson_fail query in
