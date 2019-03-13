@@ -1,5 +1,7 @@
 
 
+open Yojson.Safe
+
 type t = string option [@@deriving yojson]
 
 exception Null_ObjectId
@@ -24,3 +26,14 @@ let to_string = function
 let to_bson = function
 	| None -> Bson.Null
 	| Some id -> Bson.ObjectId id
+
+let of_yojson elt =
+	match elt with
+	| `Intlit "" -> Result.Ok None
+	| `Intlit id -> Result.Ok (Some id)
+	| _ -> Result.Error "objectids are supposed to be encoded as `Intlit in yojson"
+
+let to_yojson oid =
+	match oid with
+	| None -> `Intlit ""
+	| Some id -> `Intlit id
